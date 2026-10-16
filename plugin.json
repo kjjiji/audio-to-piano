@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "audio-to-piano",
+  "version": "0.1.0",
+  "description": "分析整首音频，分离并转录旋律、和声与低音，制作钢琴 MIDI、试听和源音频对比；支持从缓存继续修整节奏与重音。",
+  "author": { "name": "kjjiji" },
+  "license": "MIT",
+  "keywords": ["audio", "piano", "midi", "transcription", "music"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "钢琴改编助手",
+        "shortDescription": "分析音频，制作钢琴版与 MIDI",
+        "longDescription": "把音频分析、分声部转 MIDI、钢琴编配、重音修整、音频合成和文件交付整理为可复用流程。附带可运行的 Python 脚本、断点继续和校验报告。需要可执行 Python 与 FFmpeg 的环境；模型和钢琴音色在运行环境中配置，不包含歌曲、模型权重或音色库。",
+        "developerName": "kjjiji",
+        "category": "Productivity",
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg",
+        "defaultPrompt": [
+          "分析这首音频并制作整首钢琴版，导出 MIDI、MP3 和原曲同段对比，保留原低音切分。",
+          "根据这个 MIDI 制作钢琴试听，并检查重复音和音符时间。",
+          "核对这版钢琴伴奏的重音与切分，根据原音频修整指定时间段。"
+        ]
+      }
+    }
+  }
+}

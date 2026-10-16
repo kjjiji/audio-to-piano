@@ -1,0 +1,4 @@
+interface:
+  display_name: "钢琴改编助手"
+  short_description: "分析音频，转 MIDI，制作钢琴试听并修整节奏"
+  default_prompt: "使用 $audio-to-piano 分析我提供的音频，制作整首钢琴 MIDI、MP3 和同段对比，并保留原低音切分。"

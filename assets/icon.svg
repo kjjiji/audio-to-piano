@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>钢琴改编助手</title>
+  <rect width="512" height="512" rx="112" fill="#172033"/>
+  <g fill="none" stroke="#76ded2" stroke-width="17" stroke-linecap="round">
+    <path d="M94 163v-18M133 188v-67M172 204V99M211 185v-68M250 167v-31M289 184v-65M328 201V99M367 189v-69M406 164v-20"/>
+  </g>
+  <rect x="81" y="243" width="350" height="183" rx="22" fill="#f9f5e9"/>
+  <g stroke="#172033" stroke-width="7">
+    <path d="M131 244v179M181 244v179M231 244v179M281 244v179M331 244v179M381 244v179"/>
+  </g>
+  <g fill="#172033">
+    <rect x="114" y="242" width="34" height="112" rx="5"/>
+    <rect x="164" y="242" width="34" height="112" rx="5"/>
+    <rect x="264" y="242" width="34" height="112" rx="5"/>
+    <rect x="314" y="242" width="34" height="112" rx="5"/>
+    <rect x="364" y="242" width="34" height="112" rx="5"/>
+  </g>
+</svg>
