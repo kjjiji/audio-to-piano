@@ -2,7 +2,7 @@
 
 ## Public-source packaging check — 2026-10-16
 
-The public-source copy retains the 0.1.0 transcription pipeline. Its README now includes source download, local-skill installation and standalone CLI usage; the packager also excludes Git metadata so it works from a normal clone.
+The public-source copy retains the 0.1.0 transcription pipeline. Its README now includes source download, local-skill installation and standalone CLI usage; the packager also excludes Git metadata so it works from a normal clone. The public `dist/` directory holds only the downloadable plugin ZIP and its checksum, and is excluded from the package itself.
 
 All five regression tests passed again on Python 3.11.17. The CLI help and runtime doctor passed using the existing configured environment and external model/font assets. The package passed the official plugin JSON schema, Python syntax, contained-path and archive-byte checks with a local `.git` directory present. No user media, task caches, model weights, soundfonts or credentials are included. These publication checks did not rerun full-song transcription or measure musical accuracy. The integration results below are the earlier 2026-10-13 runs.
 

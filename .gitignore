@@ -30,4 +30,5 @@ soundfonts/
 *.onnx
 *.npz
 *.zip
+!/dist/audio-to-piano-*.zip
 *.log

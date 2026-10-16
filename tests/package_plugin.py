@@ -54,7 +54,7 @@ def package(root,destination,schema=None):
     for path in root.rglob('*'):
         if path.is_symlink():raise ValueError('Symlink in plugin')
         relative=path.relative_to(root)
-        if any(part in ['.git','__pycache__'] for part in relative.parts):continue
+        if relative.parts[0]=='dist' or any(part in ['.git','__pycache__'] for part in relative.parts):continue
         if not path.is_file():continue
         if any(part in ['.venv','node_modules'] or part.startswith('.env') for part in relative.parts):
             raise ValueError('Runtime, secrets or repository data in plugin')

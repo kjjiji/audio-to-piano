@@ -2,13 +2,13 @@
 
 分析音频、分离声部、制作整首钢琴 MIDI 和试听，并根据原曲检查低音切分与重音。包含技能说明、可运行的 Python 脚本与校验流程，支持在具备命令执行能力的 AI 助手或 Linux 主机中使用。
 
-公开源码：[kjjiji/111](https://github.com/kjjiji/111) · [下载安装包](https://github.com/kjjiji/111/releases/latest) · [运行说明](skills/audio-to-piano/references/runtime.md) · [测试记录](VALIDATION.md)
+公开源码：[kjjiji/111](https://github.com/kjjiji/111) · [下载安装包](https://github.com/kjjiji/111/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip) · [运行说明](skills/audio-to-piano/references/runtime.md) · [测试记录](VALIDATION.md)
 
 这是源码和技能插件；音频处理需要另行配置执行环境、模型与钢琴音色。GitHub 页面可以公开阅读和下载，当前没有在线上传歌曲并转换的网页服务。
 
 ## 获取与安装
 
-下载 [Releases](https://github.com/kjjiji/111/releases/latest) 中的 `audio-to-piano-0.1.0.zip`，或克隆源码：
+下载 [audio-to-piano-0.1.0.zip](https://github.com/kjjiji/111/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip)（[SHA-256 校验值](https://github.com/kjjiji/111/blob/main/dist/SHA256SUMS.txt)），或克隆源码：
 
 ```bash
 git clone https://github.com/kjjiji/111.git audio-to-piano
@@ -91,7 +91,7 @@ python skills/audio-to-piano/scripts/piano.py --help
 python tests/package_plugin.py . /tmp/audio-to-piano-0.1.0.zip
 ```
 
-打包器会排除 Git 元数据和 Python 缓存，拒绝歌曲、MIDI、音色、模型和环境目录进入安装包。项目目录名称须为 `audio-to-piano`；下载 GitHub 自动生成的源码 ZIP 后，请将解压目录改成此名称再运行打包命令。GitHub Actions 只运行回归与打包检查，不下载模型或处理用户歌曲。
+打包器会排除 Git 元数据、Python 缓存和 `dist/` 下载目录，拒绝歌曲、MIDI、音色、模型和环境目录进入安装包。`dist/` 只保存已验证的安装包及校验值，不进入安装包自身。项目目录名称须为 `audio-to-piano`；下载 GitHub 自动生成的源码 ZIP 后，请将解压目录改成此名称再运行打包命令。GitHub Actions 只运行回归与打包检查，不下载模型或处理用户歌曲。
 
 ## 许可
 
