@@ -17,6 +17,8 @@ description: 分析用户提供的音乐音频，分离声部、转录 MIDI，�
 
 读 [运行与安装](references/runtime.md)。在隔离 Python 环境里运行 scripts/piano.py doctor，确认 FFmpeg、FluidSynth、模型与 SF2 音色。已有合适环境就复用；缺少依赖才运行 bootstrap.py。脚本不会启动服务器，没有账户凭证或 API key。模型和音色留在执行环境，插件包不包含它们。
 
+已有 CUDA/MuScriptor 环境或需要 GPU 时读 [GPU 复用与验证](references/gpu.md)。先用已有解释器运行 `doctor --device cuda:0 --backend muscriptor --strict`，再加 `--smoke-test` 或 `--smoke-audio` 验证真实推理；不能用 CPU 检查或 `cuda_available` 代替 GPU 模型验证。补依赖使用 `bootstrap.py --profile reuse`，独立安装使用 `--profile cuda`。GPU 支持不等于音乐准确度已提升。
+
 ## 默认整曲流程
 
 用户要求整首就处理整首。短片段可用于检测或调试，但不能作为整首交付。常规分离、推理、导出和私有文件交付属于任务内操作，已有授权时继续工作。

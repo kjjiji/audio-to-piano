@@ -1,4 +1,4 @@
-# Tested CPU workflow; torch/torchaudio are installed separately by bootstrap.
+# Shared runtime; torch/torchaudio are installed separately by bootstrap.
 numpy==1.26.4
 scipy==1.17.1
 librosa==0.11.0
@@ -10,7 +10,8 @@ onnxruntime==1.31.0
 demucs==4.1.0
 muscriptor==0.3.0
 beat_this==1.1.0
-essentia==2.1b6.dev1110
+essentia==2.1b6.dev1110; python_version < "3.12"
+essentia==2.1b6.dev1389; python_version >= "3.12"
 resampy==0.4.2
 mir-eval==0.8.2
 scikit-learn==1.9.1

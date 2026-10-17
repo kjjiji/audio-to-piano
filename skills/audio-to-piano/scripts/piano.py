@@ -46,13 +46,20 @@ def cache_candidates():
 
 def resolve_model(explicit,size):
     if explicit:
-        path=Path(explicit).expanduser().resolve()
+        # Keep the HF snapshot symlink path: config.json is beside it, not in blobs/.
+        path=Path(os.path.abspath(Path(explicit).expanduser()))
         if path.is_dir():path=path/'model.safetensors'
         if not path.is_file():raise ValueError('Model not found: '+str(path))
         return str(path)
     for root in cache_candidates():
         for candidate in [root/'muscriptor'/size/'model.safetensors',root/'FuFumidi-models/muscriptor'/size/'model.safetensors']:
-            if candidate.is_file():return str(candidate.resolve())
+            if candidate.is_file():return str(candidate.absolute())
+    try:
+        from huggingface_hub import hf_hub_download
+        path=hf_hub_download(repo_id='MuScriptor/muscriptor-'+size,
+            filename='model.safetensors',local_files_only=True)
+        if Path(path).is_file():return str(Path(path).absolute())
+    except Exception:pass  # Local-cache lookup is optional and never downloads.
     return None
 
 def resolve_font(explicit):
@@ -108,9 +115,72 @@ def inspect_source(path):
     return {'path':str(path),'file_name':path.name,'bytes':path.stat().st_size,'sha256':digest(path),'probe':probe}
 
 def device_choice(value):
-    if value!='auto':return value
-    import torch
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
+    from runtime_support import select_device
+    return select_device(value)
+
+def doctor(args):
+    from runtime_support import import_diagnostics,model_diagnostics,model_smoke_test,torch_diagnostics,onnx_diagnostics,package_conflicts
+    info=dependencies();info['dependencies_ready']=info['ready']
+    imports,versions=import_diagnostics()
+    info.update(imports=imports,package_versions=versions)
+    info['dependencies_ready']=info['dependencies_ready'] and all(item['ready'] for item in imports.values())
+    info['package_compatibility']=package_conflicts()
+    info['onnx']=onnx_diagnostics()
+    info['dependencies_ready']=info['dependencies_ready'] and info['package_compatibility']['ready'] and info['onnx']['ready']
+    info['runtime']=torch_diagnostics(args.device,args.dtype)
+    errors=[]
+    try:model=resolve_model(args.model_path,args.model_size or 'medium')
+    except (ValueError,OSError) as error:model=None;errors.append(str(error))
+    info['model_path']=model;info['model']=model_diagnostics(model)
+    font=None;font_info={'ready':False,'synthesis_test':{'status':'not_run'}}
+    try:
+        font=resolve_font(args.soundfont)
+        if not font:raise ValueError('No piano SoundFont found; pass --soundfont or set PIANO_SOUNDFONT')
+        from soundfont_checks import piano_coverage
+        mask=piano_coverage(font)
+        coverage=bool(mask[21:109,1:].all())
+        font_info.update(path=font,bank=0,program=0,covers_88_keys_all_velocities=coverage,
+            uncovered_key_velocity_pairs=int((~mask[21:109,1:]).sum()))
+        if not coverage:raise ValueError('SoundFont has silent key/velocity gaps; select continuous piano coverage')
+        import fluidsynth
+        import numpy as np
+        synth=fluidsynth.Synth(samplerate=22050)
+        try:
+            font_id=synth.sfload(font)
+            if font_id<0 or synth.program_select(0,font_id,0,0)!=0:raise ValueError('Cannot load bank 0/program 0 piano')
+            synth.noteon(0,60,80);samples=synth.get_samples(11025)
+            if not np.isfinite(samples).all() or not np.any(samples):raise ValueError('SoundFont synthesis is silent or non-finite')
+            font_info['synthesis_test']={'status':'passed','pitch':60,'velocity':80}
+        finally:synth.delete()
+        font_info['ready']=True
+    except Exception as error:font_info['error']=f'{type(error).__name__}: {error}'
+    info['soundfont']=font;info['soundfont_checks']=font_info
+    info['soundfont_covers_88_keys_all_velocities']=font_info.get('covers_88_keys_all_velocities',False)
+    try:info['beat_checkpoint']=resolve_beats(args.beat_checkpoint)
+    except (ValueError,OSError) as error:info['beat_checkpoint']=None;errors.append(str(error))
+    info['beat_checkpoint_status']='local' if info['beat_checkpoint'] else 'not_cached; pipeline may download final0'
+    backend=args.backend or 'auto'
+    model_required=backend=='muscriptor' or (backend=='auto' and bool(model))
+    info['selected_backend']='muscriptor' if model_required else 'basic-pitch'
+    info['model_inference']={'status':'not_run','reason':'Use --smoke-test to load local weights and run multi-instrument inference'}
+    if args.smoke_test:
+        if not info['model']['ready'] or not info['runtime']['ready']:
+            info['model_inference']={'status':'failed','error':'Local model metadata and device checks must pass first'}
+        else:
+            try:
+                import torch
+                torch.set_num_threads(min(max(1,args.threads or cpu_budget()),cpu_budget()))
+                info['model_inference']=model_smoke_test(model,info['runtime']['selected_device'],
+                    info['runtime']['selected_dtype'],args.smoke_audio)
+                info['model']['weights_loaded']=True
+            except Exception as error:info['model_inference']={'status':'failed','error':f'{type(error).__name__}: {error}'}
+    info['gpu_inference_verified']=(info['model_inference']['status']=='passed'
+        and info['runtime'].get('selected_device','').startswith('cuda'))
+    info['errors']=errors
+    info['ready']=(info['dependencies_ready'] and info['runtime']['ready'] and font_info['ready']
+        and (not model_required or info['model']['ready']) and not errors
+        and (not args.smoke_test or info['model_inference']['status']=='passed'))
+    return info
 
 def configure(args,source=None):
     work=Path(args.work_dir).expanduser().resolve();work.mkdir(parents=True,exist_ok=True)
@@ -126,6 +196,13 @@ def configure(args,source=None):
     if backend=='auto':backend='muscriptor' if model or args.download_model else 'basic-pitch'
     if backend=='muscriptor' and not model and not args.download_model:
         raise ValueError('MuScriptor weights missing. Supply --model-path, enable --download-model with valid model access, or choose --backend basic-pitch.')
+    if backend=='muscriptor' and model and args.command!='render-midi':
+        from runtime_support import model_diagnostics
+        model_info=model_diagnostics(model)
+        if not model_info['ready']:raise ValueError(model_info['error'])
+    device=device_choice(args.device)
+    from runtime_support import select_dtype
+    dtype=select_dtype(args.dtype,device)
     out=Path(args.output_dir or existing.get('output_dir') or work/'output').expanduser().resolve();out.mkdir(parents=True,exist_ok=True)
     original=source['file_name'] if source else existing.get('source_name','Piano-Arrangement')
     stem=re.sub(r'[^\w.\-]+','-',Path(original).stem).strip('.-')[:70] or 'Piano-Arrangement'
@@ -139,7 +216,7 @@ def configure(args,source=None):
         'model_path':model,'model_size':model_size,'backend':backend,
         'transcription_label':('MuScriptor local weights' if model else 'MuScriptor '+model_size) if backend=='muscriptor' else 'Basic Pitch ONNX (fallback)',
         'beat_checkpoint':resolve_beats(args.beat_checkpoint or existing.get('beat_checkpoint')),
-        'vocal_mode':args.vocal_mode,'device':device_choice(args.device),
+        'vocal_mode':args.vocal_mode,'device':device,'dtype':dtype,
         'threads':min(max(1,args.threads or cpu_budget()),cpu_budget()),
         'tempo_bpm':args.tempo or existing.get('tempo_bpm'),'meter':args.meter or existing.get('meter'),
         'include_primary_melody':not args.accompaniment_only,
@@ -177,10 +254,23 @@ def completed(work,stage,fingerprint):
     state=json.loads(state_file(work).read_text()) if state_file(work).exists() else {}
     state[stage]={'fingerprint':fingerprint,'completed_at':time.time()};save(state_file(work),state)
 
+def transcription_fingerprint(base,role,config):
+    model_identity={'path':config['model_path'],'size':config['model_size']} if config['backend']=='muscriptor' else None
+    if model_identity and config['model_path']:
+        stat=Path(config['model_path']).stat();model_identity.update(bytes=stat.st_size,mtime_ns=stat.st_mtime_ns)
+        model_identity['config_sha256']=digest(Path(config['model_path']).with_name('config.json'))
+    return signature({**base,'role':role,'backend':config['backend'],'model':model_identity,
+        'inference_runtime':2,'device':config['device'],'dtype':config['dtype'],
+        'muscriptor_version':importlib.metadata.version('muscriptor') if config['backend']=='muscriptor' else None})
+
 def run_audio(args):
     ready=dependencies()
     if not ready['ready']:raise ValueError('Runtime dependencies missing; run doctor and bootstrap first: '+json.dumps(ready))
     source=inspect_source(args.input);work,config=configure(args,source)
+    if config['device'].startswith('cuda'):
+        import torch
+        from runtime_support import kernel_check
+        kernel_check(torch,config['device'],config['dtype'])
     if args.force_from:
         stages=['decode','separate','analyse','transcribe','export']
         state=json.loads(state_file(work).read_text()) if state_file(work).exists() else {}
@@ -231,10 +321,7 @@ def run_audio(args):
     if resolved=='vocal' and config['include_primary_melody']:roles.insert(0,'vocals')
     pending=[]
     for role in roles:
-        model_identity={'path':config['model_path'],'size':config['model_size']}
-        if config['model_path']:
-            stat=Path(config['model_path']).stat();model_identity.update(bytes=stat.st_size,mtime_ns=stat.st_mtime_ns)
-        key=signature({**base,'role':role,'backend':config['backend'],'model':model_identity})
+        key=transcription_fingerprint(base,role,config)
         target=work/(role+'-transcribed.mid')
         if not cached(work,'transcribe-'+role,key,[target]):pending.append((role,key))
     if config['backend']=='basic-pitch':
@@ -334,6 +421,8 @@ def parser():
         p.add_argument('--backend',choices=['auto','muscriptor','basic-pitch'])
         p.add_argument('--download-model',action='store_true')
         p.add_argument('--beat-checkpoint');p.add_argument('--device',default='auto')
+        p.add_argument('--dtype',choices=['auto','float32','float16','bfloat16'],default='auto',
+            help='MuScriptor precision; auto preserves CPU bfloat16 and uses native CUDA bfloat16 when supported')
         p.add_argument('--threads',type=int);p.add_argument('--tempo',type=float);p.add_argument('--meter')
         p.add_argument('--vocal-mode',choices=['auto','vocal','instrumental'],default='auto')
         p.add_argument('--accompaniment-only',action='store_true')
@@ -343,6 +432,10 @@ def parser():
         p.add_argument('--force-from',choices=['decode','separate','analyse','transcribe','export'])
         if name=='import-work':p.add_argument('--from-work',required=True)
         if name=='compare':p.add_argument('--start',type=float,required=True);p.add_argument('--length',type=float,default=8)
+        if name=='doctor':
+            p.add_argument('--strict',action='store_true',help='Exit 1 if the selected runtime/backend/font is not ready')
+            p.add_argument('--smoke-test',action='store_true',help='Load local MuScriptor weights and transcribe five seconds; no model downloads')
+            p.add_argument('--smoke-audio',help='Local diagnostic audio (first five seconds); implies --smoke-test')
     return root
 
 def main():
@@ -351,13 +444,10 @@ def main():
     if args.meter:
         if not re.fullmatch(r'(?:[1-9]|1[0-2])/(?:1|2|4|8|16)',args.meter):raise ValueError('Unsupported meter; use N/D, e.g. 4/4 or 6/8')
     if args.command=='doctor':
-        info=dependencies();font=resolve_font(args.soundfont);info['soundfont']=font
-        info['model_path']=resolve_model(args.model_path,args.model_size or 'medium')
-        info['beat_checkpoint']=resolve_beats(args.beat_checkpoint)
-        if font and info['modules']['numpy']:
-            from soundfont_checks import piano_coverage
-            mask=piano_coverage(font);info['soundfont_covers_88_keys_all_velocities']=bool(mask[21:109,1:].all())
+        if args.smoke_audio:args.smoke_test=True
+        info=doctor(args)
         emit('doctor',**info)
+        if args.strict and not info['ready']:raise SystemExit(1)
     elif args.command=='inspect':emit('inspect',**inspect_source(args.input))
     elif args.command=='run':run_audio(args)
     elif args.command=='import-work':import_work(args)

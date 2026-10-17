@@ -10,6 +10,9 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,12 +20,14 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
       - name: Install regression dependencies
         run: python -m pip install numpy==1.26.4 scipy==1.17.1 pretty-midi==0.2.11.post0 mido==1.3.3
       - name: Run regression tests
         working-directory: audio-to-piano
-        run: python tests/test_regressions.py
+        run: |
+          python tests/test_regressions.py
+          python tests/test_runtime.py
       - name: Check CLI entry point
         working-directory: audio-to-piano
         run: python skills/audio-to-piano/scripts/piano.py --help
@@ -31,5 +36,33 @@ jobs:
         run: python tests/package_plugin.py . /tmp/audio-to-piano-0.1.0.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: audio-to-piano-0.1.0
+          name: audio-to-piano-0.1.0-python-${{ matrix.python }}
           path: /tmp/audio-to-piano-0.1.0.zip
+
+  cpu-runtime:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: audio-to-piano
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install audio system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libfluidsynth3 timgm6mb-soundfont
+      - name: Install isolated CPU runtime
+        working-directory: audio-to-piano
+        run: python skills/audio-to-piano/scripts/bootstrap.py --venv /tmp/piano-runtime
+      - name: Exercise CPU inference and audio export without published model weights
+        working-directory: audio-to-piano
+        env:
+          OMP_NUM_THREADS: '2'
+          OPENBLAS_NUM_THREADS: '1'
+          TEST_PIANO_SOUNDFONT: /usr/share/sounds/sf2/TimGM6mb.sf2
+        run: /tmp/piano-runtime/bin/python tests/test_runtime_integration.py

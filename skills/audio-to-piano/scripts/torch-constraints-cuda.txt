@@ -1,0 +1,3 @@
+# Keep the CUDA build when resolving shared dependencies.
+torch==2.5.1+cu124
+torchaudio==2.5.1+cu124
