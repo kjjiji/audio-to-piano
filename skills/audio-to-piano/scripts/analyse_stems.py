@@ -33,6 +33,7 @@ def cpu_session(path,*args,**kwargs):
     options.intra_op_num_threads=1
     options.inter_op_num_threads=1
     kwargs['sess_options']=options
+    kwargs['providers']=['CPUExecutionProvider']
     return original_session(path,*args,**kwargs)
 ort.InferenceSession=cpu_session
 from basic_pitch.inference import predict

@@ -2,16 +2,16 @@
 
 分析音频、分离声部、制作整首钢琴 MIDI 和试听，并根据原曲检查低音切分与重音。包含技能说明、可运行的 Python 脚本与校验流程，支持在具备命令执行能力的 AI 助手或 Linux 主机中使用。
 
-公开源码：[kjjiji/111](https://github.com/kjjiji/111) · [下载安装包](https://github.com/kjjiji/111/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip) · [运行说明](skills/audio-to-piano/references/runtime.md) · [测试记录](VALIDATION.md)
+公开源码：[kjjiji/audio-to-piano](https://github.com/kjjiji/audio-to-piano) · [下载安装包](https://github.com/kjjiji/audio-to-piano/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip) · [运行说明](skills/audio-to-piano/references/runtime.md) · [测试记录](VALIDATION.md)
 
 这是源码和技能插件；音频处理需要另行配置执行环境、模型与钢琴音色。GitHub 页面可以公开阅读和下载，当前没有在线上传歌曲并转换的网页服务。
 
 ## 获取与安装
 
-下载 [audio-to-piano-0.1.0.zip](https://github.com/kjjiji/111/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip)（[SHA-256 校验值](https://github.com/kjjiji/111/blob/main/dist/SHA256SUMS.txt)），或克隆源码：
+下载 [audio-to-piano-0.1.0.zip](https://github.com/kjjiji/audio-to-piano/raw/refs/heads/main/dist/audio-to-piano-0.1.0.zip)（[SHA-256 校验值](https://github.com/kjjiji/audio-to-piano/blob/main/dist/SHA256SUMS.txt)），或克隆源码：
 
 ```bash
-git clone https://github.com/kjjiji/111.git audio-to-piano
+git clone https://github.com/kjjiji/audio-to-piano.git audio-to-piano
 cd audio-to-piano
 ```
 
@@ -45,7 +45,7 @@ cp -R skills/audio-to-piano ~/.codex/skills/
 
 需要主机可执行 Python、FFmpeg/ffprobe 和 FluidSynth，并有可用模型、SF2 钢琴音色及足够内存/磁盘。插件不包含用户歌曲、模型权重、音色采样或凭证。手机网页可以发起任务和取得文件；计算由支持命令执行的主机完成。
 
-已经验证 Linux/Python 3.11/CPU。先复用现有音频 Python 环境；新环境用隔离安装脚本：
+原完整流程已验证 Linux/Python 3.11/CPU；新增 Python 3.12 安装、运行诊断及 CPU 检查，GPU 推理仍需在实机验证。先复用现有音频 Python 环境；新 CPU 环境用隔离安装脚本：
 
 ```bash
 python3.11 skills/audio-to-piano/scripts/bootstrap.py --venv /absolute/path/audio-piano-venv
@@ -55,6 +55,8 @@ python3.11 skills/audio-to-piano/scripts/bootstrap.py --venv /absolute/path/audi
 ```
 
 模型旁保留匹配的 config.json；音色须覆盖输出实际使用的力度。系统依赖与模型获取见 [运行说明](skills/audio-to-piano/references/runtime.md)。不具备执行环境时，技能会说明缺失能力，不能自动在浏览器中运行本地脚本。
+
+RTX 3090 / Python 3.12 / 已有 MuScriptor large 的操作命令见 [GPU 环境复用与实机验证](skills/audio-to-piano/references/gpu.md)：先运行已有解释器的 doctor；仅缺依赖时用 `--profile reuse`，否则用 `--profile cuda` 建立独立 CUDA 12.4 环境。doctor 支持 `--strict`、真实设备算子检查、模型/音色检查与 `--smoke-test` 推理；`gpu_inference_verified` 只在 GPU 模型推理实际通过后为 true。这些新增功能使用当前源码，`dist/` 的 0.1.0 ZIP 保留原发布内容。
 
 ```bash
 /absolute/path/audio-piano-venv/bin/python skills/audio-to-piano/scripts/piano.py run /absolute/path/song.mp3 \
@@ -87,11 +89,13 @@ python3.11 skills/audio-to-piano/scripts/bootstrap.py --venv /absolute/path/audi
 
 ```bash
 python tests/test_regressions.py
+python tests/test_runtime.py
+python tests/test_runtime_integration.py  # 完整依赖、FFmpeg 与 SF2；微型随机模型，仅验证执行
 python skills/audio-to-piano/scripts/piano.py --help
 python tests/package_plugin.py . /tmp/audio-to-piano-0.1.0.zip
 ```
 
-打包器会排除 Git 元数据、Python 缓存和 `dist/` 下载目录，拒绝歌曲、MIDI、音色、模型和环境目录进入安装包。`dist/` 只保存已验证的安装包及校验值，不进入安装包自身。项目目录名称须为 `audio-to-piano`；下载 GitHub 自动生成的源码 ZIP 后，请将解压目录改成此名称再运行打包命令。GitHub Actions 只运行回归与打包检查，不下载模型或处理用户歌曲。
+打包器会排除 Git 元数据、Python 缓存和 `dist/` 下载目录，拒绝歌曲、MIDI、音色、模型和环境目录进入安装包。`dist/` 只保存已验证的安装包及校验值，不进入安装包自身。项目目录名称须为 `audio-to-piano`；下载 GitHub 自动生成的源码 ZIP 后，请将解压目录改成此名称再运行打包命令。GitHub Actions 在 Python 3.11/3.12 上执行回归、打包及离线 CPU 运行检查；使用临时微型随机权重，不下载正式模型或处理用户歌曲，也不验证 GPU 或音乐准确率。
 
 ## 许可
 

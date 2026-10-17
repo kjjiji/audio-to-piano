@@ -4,7 +4,9 @@
 
 ## 已验证环境
 
-Linux x86_64、Python 3.11、PyTorch/Torchaudio 2.5.1 CPU、Demucs 4.1.0、MuScriptor 0.3.0、Beat This 1.1.0、Basic Pitch 0.4.0 ONNX、NumPy 1.26.4、FluidSynth 3、FFmpeg。GPU 和其他操作系统不属于本版本已验证范围。速度取决于时长与算力，不能许诺固定处理时长。
+原 0.1.0 完整流程：Linux x86_64、Python 3.11、PyTorch/Torchaudio 2.5.1 CPU、Demucs 4.1.0、MuScriptor 0.3.0、Beat This 1.1.0、Basic Pitch 0.4.0 ONNX、NumPy 1.26.4、FluidSynth 3、FFmpeg。新增 Python 3.12 安装与 CPU 运行检查见仓库 VALIDATION.md。GPU 安装方案与诊断入口已提供，GPU 实际推理和其他操作系统仍需验证。速度取决于时长与算力，不能许诺固定处理时长。
+
+RTX 3090、Python 3.12 和已有 MuScriptor large 环境优先参考[GPU 环境复用与验证](gpu.md)。默认 CPU 安装仍保留，另有 `--profile cuda` 独立安装与 `--profile reuse` 补装模式；不要在现有 GPU 环境直接执行默认 CPU 安装。
 
 先复用现有音频环境并运行 doctor；不修改系统 Python。新环境用：
 
@@ -34,7 +36,7 @@ FFmpeg/ffprobe 和 FluidSynth 共享库由主机包管理器提供。Debian/Ubun
   --soundfont /absolute/path/piano.sf2
 ```
 
-doctor 的 ready 表示基础程序与模块齐全。还要看模型路径、音色路径和音色覆盖；ready 本身不意味着权重已经下载或转录已经完成。报告中 Basic Pitch ONNX (fallback) 是回退引擎，必须如实说明。
+doctor 现在实际导入依赖、检查配套版本、执行所选设备的小型算子、创建 CPU ONNX session，并检查模型配置、音色覆盖与实际合成。`ready` 综合所选后端、依赖、设备与音色；`--strict` 不通过时退出 1。默认仍输出诊断并退出 0。MuScriptor 模型默认不加载，`--smoke-test` 才进行本地模型推理；只有 GPU 推理通过才将 `gpu_inference_verified` 设为 true。`ready` 本身不证明已完成模型推理或音乐正确。报告中 Basic Pitch ONNX (fallback) 是回退引擎，必须如实说明。
 
 ## 缓存与安全边界
 
